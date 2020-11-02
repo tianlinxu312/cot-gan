@@ -47,11 +47,14 @@ def train(args):
     time_steps = 100
 
     if dname == 'AROne':
-        data_dist = data_utils.AROne(Dx, time_steps, np.linspace(0.1, 0.9, Dx), 0.5)
+        data_dist = data_utils.AROne(
+            Dx, time_steps, np.linspace(0.1, 0.9, Dx), 0.5)
     elif dname == 'eeg':
-        data_dist = data_utils.EEGData(Dx, time_steps, batch_size, n_iters, seed=seed)
+        data_dist = data_utils.EEGData(
+            Dx, time_steps, batch_size, n_iters, seed=seed)
     elif dname == 'SineImage':
-        data_dist = data_utils.SineImage(length=time_steps, Dx=Dx, rand_std=0.1)
+        data_dist = data_utils.SineImage(
+            length=time_steps, Dx=Dx, rand_std=0.1)
     else:
         ValueError('Data does not exist.')
 
@@ -74,13 +77,15 @@ def train(args):
     nlstm = args.nlstm
     scaling_coef = 1.0
 
-    # Define a standard multivariate normal for (z1, z2, ..., zT) --> (y1, y2, ..., yT)
+    # Define a standard multivariate normal for
+    # (z1, z2, ..., zT) --> (y1, y2, ..., yT)
     z_dims_t = args.z_dims_t
     y_dims = args.Dy
     dist_z = tfp.distributions.Uniform(-1, 1)
     dist_y = tfp.distributions.Uniform(-1, 1)
 
-    # Create instances of generator, discriminator_h and discriminator_m CONV VERSION
+    # Create instances of generator, discriminator_h and
+    # discriminator_m CONV VERSION
     g_state_size = args.g_state_size
     d_state_size = args.d_state_size
     g_filter_size = args.g_filter_size
@@ -111,13 +116,15 @@ def train(args):
     lreg = int(np.round(np.log10(reg_penalty)))
     saved_file = f"{dname[:3]}_{test[0]}_e{lsinke:d}r{lreg:d}s{seed:d}" + \
         "{}_{}{}-{}:{}:{}.{}".format(dataset, datetime.now().strftime("%h"),
-        datetime.now().strftime("%d"), datetime.now().strftime("%H"),
-        datetime.now().strftime("%M"), datetime.now().strftime("%S"),
-        datetime.now().strftime("%f"))
+                                     datetime.now().strftime("%d"),
+                                     datetime.now().strftime("%H"),
+                                     datetime.now().strftime("%M"),
+                                     datetime.now().strftime("%S"),
+                                     datetime.now().strftime("%f"))
 
     model_fn = "%s_Dz%d_Dy%d_Dx%d_bs%d_gss%d_gfs%d_dss%d_dfs%d_ts%d_r%d_eps%d_l%d_lr%d_nl%d_s%02d" % (
         dname, z_dims_t, y_dims, Dx, batch_size, g_state_size, g_filter_size,
-        d_state_size, d_filter_size, time_steps, np.round(np.log10(reg_penalty)), 
+        d_state_size, d_filter_size, time_steps, np.round(np.log10(reg_penalty)),
         np.round(np.log10(sinkhorn_eps)), sinkhorn_l, np.round(np.log10(args.lr)), nlstm, seed)
 
     log_dir = "./trained/{}/log".format(saved_file)
@@ -245,7 +252,7 @@ def train(args):
                 break
             else:
                 if it_counts % 100 == 0 or it_counts <= 10:
-                    # print("---  Plot samples produced by generator after %d iterations ---" % it_counts)
+                    # print("Plot samples produced by generator after %d iterations" % it_counts)
                     z = dist_z.sample([batch_size, time_steps, z_dims_t])
                     y = dist_y.sample([batch_size, y_dims])
                     samples = generator.call(z, y, training=False)
@@ -257,9 +264,12 @@ def train(args):
                     with train_writer.as_default():
                         tf.summary.image("Training data", img, step=it_counts)
                     # save model to file
-                    generator.save_weights("./trained/{}/{}/".format(test, model_fn))
-                    discriminator_h.save_weights("./trained/{}/{}_h/".format(test, model_fn))
-                    discriminator_m.save_weights("./trained/{}/{}_m/".format(test, model_fn))
+                    generator.save_weights("./trained/{}/{}/".format(test,
+                                                                     model_fn))
+                    discriminator_h.save_weights("./trained/{}/{}_h/".format(test,
+                                                                             model_fn))
+                    discriminator_m.save_weights("./trained/{}/{}_m/".format(test,
+                                                                             model_fn))
             continue
 
     print("--- The entire training takes %s minutes ---" % ((time.time() - start_time) / 60.0))
@@ -290,8 +300,7 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--lr', type=float, default=1e-3)
     parser.add_argument('-bn', '--bn', type=int, default=1,
                         help="batch norm")
-    
+
     args = parser.parse_args()
-    
+
     train(args)
-    
