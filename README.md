@@ -30,7 +30,7 @@ $ cd cot-gan/
 # Create a virtual environment called 'venv'
 $ virtualenv venv 
 $ source venv/bin/activate    # Activate virtual environment
-$ pip install -r requirements.txt 
+$ python3 -m pip install -r requirements.txt 
 ```
 ## Training COT-GAN
 We trained COT-GAN on synthetic low-dimensional datasets as well as two high-dimensional video datasets: a [human action dataset](http://www.wisdom.weizmann.ac.il/~vision/SpaceTimeActions.html) and an [animated Sprites dataset](https://github.com/jrconway3/Universal-LPC-spritesheet)
