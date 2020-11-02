@@ -12,10 +12,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from datetime import datetime
-from functools import partial
-
-import matplotlib as mpl
-mpl.use("Agg")
 
 os.environ["OMP_NUM_THREADS"] = "4"
 os.environ["OPENBLAS_NUM_THREADS"] = "4"
