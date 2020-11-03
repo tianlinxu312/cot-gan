@@ -7,7 +7,7 @@ This repository contains an implementation and further details of COT-GAN.
 
 Reference: Tianlin Xu, Li K. Wenliang, Michael Munn, Beatrice Acciaio, "COT-GAN: Generating Sequential Data via Causal Optimal Transport," Neural Information Processing Systems (NeurIPS), 2020.
 
-Paper Link: https://arxiv.org/abs/2006.08571 (replace with Neurips link)
+Paper Link: https://arxiv.org/abs/2006.08571
 
 Contact: tianlin.xu1@gmail.com
 
