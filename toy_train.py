@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import argparse
 import data_utils
 import gan_utils
@@ -8,11 +7,9 @@ import os
 import math
 import time
 import tqdm
-
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-
 from datetime import datetime
 
 os.environ["OMP_NUM_THREADS"] = "4"
@@ -23,12 +20,12 @@ os.environ["NUMEXPR_NUM_THREADS"] = "4"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 tf.keras.backend.set_floatx('float32')
-
 start_time = time.time()
 
 
 def train(args):
     # hyper-parameter settings
+    global generator
     dname = args.dname
     test = args.test
     time_steps = args.time_steps
@@ -41,8 +38,8 @@ def train(args):
 
     n_iters = 100000
     Dx = 10
-    g_output_activation = 'linear'
-    time_steps = 100
+    g_output_activation = 'tanh'
+    time_steps = args.time_steps
 
     if dname == 'AROne':
         data_dist = data_utils.AROne(
@@ -92,19 +89,19 @@ def train(args):
 
     if args.gen == "fc":
         generator = gan.SimpleGenerator(
-            batch_size, time_steps, Dx, g_filter_size, z_dims_t,
+            batch_size, time_steps // 2, Dx, g_filter_size, z_dims_t,
             output_activation=g_output_activation)
     elif args.gen == "lstm":
         generator = gan.ToyGenerator(
-            batch_size, time_steps, z_dims_t, Dx, g_state_size, g_filter_size,
+            batch_size, time_steps // 2, z_dims_t, Dx, g_state_size, g_filter_size,
             output_activation=g_output_activation, nlstm=nlstm, nlayer=2,
             Dy=y_dims, bn=bn)
 
     discriminator_h = gan.ToyDiscriminator(
-        batch_size, time_steps, z_dims_t, Dx, d_state_size, d_filter_size,
+        batch_size, time_steps // 2, z_dims_t, Dx, d_state_size, d_filter_size,
         kernel_size=disc_kernel_width, nlayer=2, nlstm=0, bn=bn)
     discriminator_m = gan.ToyDiscriminator(
-        batch_size, time_steps, z_dims_t, Dx, d_state_size, d_filter_size,
+        batch_size, time_steps // 2, z_dims_t, Dx, d_state_size, d_filter_size,
         kernel_size=disc_kernel_width, nlayer=2, nlstm=0, bn=bn)
 
     # data_utils.check_model_summary(batch_size, z_dims, generator)
@@ -120,10 +117,7 @@ def train(args):
                                      datetime.now().strftime("%S"),
                                      datetime.now().strftime("%f"))
 
-    model_fn = "%s_Dz%d_Dy%d_Dx%d_bs%d_gss%d_gfs%d_dss%d_dfs%d_ts%d_r%d_eps%d_l%d_lr%d_nl%d_s%02d" % (
-        dname, z_dims_t, y_dims, Dx, batch_size, g_state_size, g_filter_size,
-        d_state_size, d_filter_size, time_steps, np.round(np.log10(reg_penalty)),
-        np.round(np.log10(sinkhorn_eps)), sinkhorn_l, np.round(np.log10(args.lr)), nlstm, seed)
+    model_fn = "ar1_preds"
 
     log_dir = "./trained/{}/log".format(saved_file)
 
@@ -160,31 +154,30 @@ def train(args):
 
     @tf.function
     def disc_training_step(real_data, real_data_p):
-        hidden_z = dist_z.sample([batch_size, time_steps, z_dims_t])
-        hidden_z_p = dist_z.sample([batch_size, time_steps, z_dims_t])
-        hidden_y = dist_y.sample([batch_size, y_dims])
-        hidden_y_p = dist_y.sample([batch_size, y_dims])
+        # split real data to training inputs and predictions
+        real_preds = real_data[:, time_steps // 2:, :]
+        real_preds_p = real_data_p[:, time_steps // 2:, :]
+        real_inputs = real_data[:, :time_steps // 2, :]
+        real_inputs_p = real_data_p[:, :time_steps // 2, :]
 
         with tf.GradientTape(persistent=True) as disc_tape:
-            fake_data = generator.call(hidden_z, hidden_y)
-            fake_data_p = generator.call(hidden_z_p, hidden_y_p)
+            fake_data = generator.call(real_inputs)
+            fake_data_p = generator.call(real_inputs_p)
 
             h_fake = discriminator_h.call(fake_data)
 
-            m_real = discriminator_m.call(real_data)
+            m_real = discriminator_m.call(real_preds)
             m_fake = discriminator_m.call(fake_data)
 
-            h_real_p = discriminator_h.call(real_data_p)
+            h_real_p = discriminator_h.call(real_preds_p)
             h_fake_p = discriminator_h.call(fake_data_p)
 
-            m_real_p = discriminator_m.call(real_data_p)
+            m_real_p = discriminator_m.call(real_preds_p)
 
-            loss1 = gan_utils.compute_mixed_sinkhorn_loss(
-                real_data, fake_data, m_real, m_fake, h_fake, scaling_coef,
-                sinkhorn_eps, sinkhorn_l, real_data_p, fake_data_p, m_real_p,
-                h_real_p, h_fake_p)
-            pm1 = gan_utils.scale_invariante_martingale_regularization(
-                m_real, reg_penalty, scaling_coef)
+            loss1 = gan_utils.compute_mixed_sinkhorn_loss(real_preds, fake_data, m_real, m_fake, h_fake, scaling_coef,
+                                                          sinkhorn_eps, sinkhorn_l, real_preds_p, fake_data_p, m_real_p,
+                                                          h_real_p, h_fake_p)
+            pm1 = gan_utils.scale_invariante_martingale_regularization(m_real, reg_penalty, scaling_coef)
             disc_loss = - loss1 + pm1
         # update discriminator parameters
         disch_grads, discm_grads = disc_tape.gradient(
@@ -194,33 +187,32 @@ def train(args):
 
     @tf.function
     def gen_training_step(real_data, real_data_p):
-        hidden_z = dist_z.sample([batch_size, time_steps, z_dims_t])
-        hidden_z_p = dist_z.sample([batch_size, time_steps, z_dims_t])
-        hidden_y = dist_y.sample([batch_size, y_dims])
-        hidden_y_p = dist_y.sample([batch_size, y_dims])
+        # split real data to training inputs and predictions
+        real_preds = real_data[:, time_steps // 2:, :]
+        real_preds_p = real_data_p[:, time_steps // 2:, :]
+        real_inputs = real_data[:, :time_steps // 2, :]
+        real_inputs_p = real_data_p[:, :time_steps // 2, :]
 
         with tf.GradientTape() as gen_tape:
-            fake_data = generator.call(hidden_z, hidden_y)
-            fake_data_p = generator.call(hidden_z_p, hidden_y_p)
+            fake_data = generator.call(real_inputs)
+            fake_data_p = generator.call(real_inputs_p)
 
             h_fake = discriminator_h.call(fake_data)
 
-            m_real = discriminator_m.call(real_data)
+            m_real = discriminator_m.call(real_preds)
             m_fake = discriminator_m.call(fake_data)
 
-            h_real_p = discriminator_h.call(real_data_p)
+            h_real_p = discriminator_h.call(real_preds_p)
             h_fake_p = discriminator_h.call(fake_data_p)
 
-            m_real_p = discriminator_m.call(real_data_p)
+            m_real_p = discriminator_m.call(real_preds_p)
 
-            loss2 = gan_utils.compute_mixed_sinkhorn_loss(
-                real_data, fake_data, m_real, m_fake, h_fake, scaling_coef,
-                sinkhorn_eps, sinkhorn_l, real_data_p, fake_data_p, m_real_p,
-                h_real_p, h_fake_p)
+            loss2 = gan_utils.compute_mixed_sinkhorn_loss(real_preds, fake_data, m_real, m_fake, h_fake, scaling_coef,
+                                                          sinkhorn_eps, sinkhorn_l, real_preds_p, fake_data_p, m_real_p,
+                                                          h_real_p, h_fake_p)
             gen_loss = loss2
         # update generator parameters
-        generator_grads = gen_tape.gradient(
-            gen_loss, generator.trainable_variables)
+        generator_grads = gen_tape.gradient(gen_loss, generator.trainable_variables)
         gen_optimiser.apply_gradients(zip(generator_grads, generator.trainable_variables))
         return loss2
 
@@ -249,25 +241,16 @@ def train(args):
                     f.write("\n Training failed! ")
                 break
             else:
-                if it_counts % 100 == 0 or it_counts <= 10:
-                    # print("Plot samples produced by generator after %d iterations" % it_counts)
-                    z = dist_z.sample([batch_size, time_steps, z_dims_t])
-                    y = dist_y.sample([batch_size, y_dims])
-                    samples = generator.call(z, y, training=False)
-                    # save plot to file
-                    if samples.shape[-1] == 1:
-                        data_utils.plot_batch(np.asarray(samples[..., 0]), it_counts, saved_file)
-
+                if it_counts % 500 == 0 or it_counts <= 10:
+                    real_data = data_dist.batch(batch_size)
+                    samples = generator.call(real_data[:, :time_steps//2, :], training=False)
                     img = tf.transpose(tf.concat(list(samples[:5]), axis=1))[None, :, :, None]
                     with train_writer.as_default():
                         tf.summary.image("Training data", img, step=it_counts)
                     # save model to file
-                    generator.save_weights("./trained/{}/{}/".format(test,
-                                                                     model_fn))
-                    discriminator_h.save_weights("./trained/{}/{}_h/".format(test,
-                                                                             model_fn))
-                    discriminator_m.save_weights("./trained/{}/{}_m/".format(test,
-                                                                             model_fn))
+                    generator.save_weights("./trained/{}/{}/".format(test, model_fn))
+                    # discriminator_h.save_weights("./trained/{}/{}_h/".format(test, model_fn))
+                    # discriminator_m.save_weights("./trained/{}/{}_m/".format(test, model_fn))
             continue
 
     print("--- The entire training takes %s minutes ---" % ((time.time() - start_time) / 60.0))
@@ -275,7 +258,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='cot')
-    parser.add_argument('-d', '--dname', type=str, default='SineImage',
+    parser.add_argument('-d', '--dname', type=str, default='AROne',
                         choices=['SineImage', 'AROne', 'eeg'])
     parser.add_argument('-t', '--test', type=str, default='cot',
                         choices=['cot'])
@@ -286,7 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('-dfs', '--d_filter_size', type=int, default=32)
     parser.add_argument('-r', '--reg_penalty', type=float, default=10.0)
     parser.add_argument('-ts', '--time_steps', type=int, default=48)
-    parser.add_argument('-sinke', '--sinkhorn_eps', type=float, default=100)
+    parser.add_argument('-sinke', '--sinkhorn_eps', type=float, default=10.0)
     parser.add_argument('-sinkl', '--sinkhorn_l', type=int, default=100)
     parser.add_argument('-Dy', '--Dy', type=int, default=10)
     parser.add_argument('-Dz', '--z_dims_t', type=int, default=10)

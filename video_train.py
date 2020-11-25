@@ -28,10 +28,10 @@ tf.keras.backend.set_floatx('float32')
 
 start_time = time.time()
 
+
 def train(args):
     test = args.test
     dname = args.dname
-    time_steps = args.time_steps
     batch_size = args.batch_size
     path = args.path
     print(path)
@@ -51,19 +51,6 @@ def train(args):
     epochs = 1
     buffer = 200
     bn = args.batch_norm
-    projection = args.projector
-
-    # path to data
-    filenames = glob.glob(path)
-    data_processor = data_utils.DataProcessor(
-        filenames, time_steps, channels)
-    batched_x = data_processor.provide_video_data(
-        buffer, batch_size * 2, x_height, x_width)
-
-    # adjust channel parameter as we want to drop the
-    # alpha channel for animated Sprites
-    if dname == 'animation':
-        channels = channels - 1
 
     dataset = dname + '-cot'
     # Number of RNN layers stacked together
@@ -88,29 +75,42 @@ def train(args):
     disc_iters = 1
     sinkhorn_eps = args.sinkhorn_eps
     sinkhorn_l = args.sinkhorn_l
-    time_steps = args.time_steps
+    total_time_steps = args.total_time_steps
+    int_time_steps = args.int_time_steps
+    pred_time_steps = total_time_steps - int_time_steps
     scaling_coef = 1.0
+
+    # path to data
+    filenames = glob.glob(path)
+    data_processor = data_utils.DataProcessor(filenames, total_time_steps, channels)
+    batched_x = data_processor.provide_video_data(buffer, batch_size * 2, x_height, x_width)
+
+    # adjust channel parameter as we want to drop the
+    # alpha channel for animated Sprites
+    if dname == 'animation':
+        channels = channels - 1
 
     # Create instances of generator, discriminator_h and
     # discriminator_m CONV VERSION
     z_width = args.z_dims_t
     z_height = args.z_dims_t
+    y_width = args.y_dims_t
+    y_height = args.y_dims_t
 
     # Define a standard multivariate normal for (z1, z2, ..., zT) --> (y1, y2, ..., yT)
     dist_z = tfp.distributions.Normal(0.0, 1.0)
     # parameters for fixed latents
-    y_dims = args.y_dims
     dist_y = tfp.distributions.Normal(0.0, 1.0)
 
-    generator = gan.VideoDCG(
-        batch_size, time_steps, x_width, x_height, z_width, z_height, g_state_size,
+    generator = gan.VideoGenerator(
+        batch_size, int_time_steps, pred_time_steps, g_state_size, x_width, x_height, z_width, z_height, y_width, y_height,
         filter_size=g_filter_size, bn=bn, nlstm=nlstm, nchannel=channels)
 
-    discriminator_h = gan.VideoDCD(
-        batch_size, time_steps, x_width, x_height, z_width, z_height, d_state_size,
+    discriminator_h = gan.VideoDiscriminator(
+        batch_size, pred_time_steps, d_state_size, x_width, x_height, z_width, z_height, y_width, y_height,
         filter_size=d_filter_size, bn=bn, nchannel=channels)
-    discriminator_m = gan.VideoDCD(
-        batch_size, time_steps, x_width, x_height, z_width, z_height, d_state_size,
+    discriminator_m = gan.VideoDiscriminator(
+        batch_size, pred_time_steps, d_state_size, x_width, x_height, z_width, z_height, y_width, y_height,
         filter_size=d_filter_size, bn=bn, nchannel=channels)
 
     # data_utils.check_model_summary(batch_size, z_dims, generator)
@@ -125,7 +125,7 @@ def train(args):
                                               datetime.now().strftime("%f"))
 
     model_fn = "%s_Dz%d_Dy%d_bs%d_gss%d_gfs%d_dss%d_dfs%d_eps%d_l%d_p%d_lr%d_nl%d_s%02d" % \
-               (dname, args.z_dims_t, args.y_dims, batch_size,
+               (dname, args.z_dims_t, args.y_dims_t, batch_size,
                 g_state_size, g_filter_size,
                 d_state_size, d_filter_size,
                 np.round(np.log10(sinkhorn_eps)), sinkhorn_l,
@@ -146,7 +146,7 @@ def train(args):
         f.write("Experiment notes: .... \n\n")
         f.write("MODEL_DATA: {}\nSEQ_LEN: {}\n".format(
             dataset,
-            time_steps, ))
+            total_time_steps, ))
         f.write("STATE_SIZE: {}\nNUM_LAYERS: {}\nLAMBDA: {}\n".format(
             g_state_size,
             n_layers,
@@ -163,30 +163,30 @@ def train(args):
     train_writer = tf.summary.create_file_writer(logdir=log_dir)
 
     @tf.function
-    def disc_training_step(real_x, real_x_p):
-        hidden_z = dist_z.sample([batch_size, time_steps, z_width * z_height])
-        hidden_z_p = dist_z.sample([batch_size, time_steps, z_width * z_height])
+    def disc_training_step(real_in, real_in_p, real_pred, real_pred_p):
+        hidden_z = dist_z.sample([batch_size, pred_time_steps, z_height, z_width])
+        hidden_z_p = dist_z.sample([batch_size, pred_time_steps, z_height, z_width])
 
-        hidden_y = dist_y.sample([batch_size, y_dims])
-        hidden_y_p = dist_y.sample([batch_size, y_dims])
+        hidden_y = dist_y.sample([batch_size, y_height, y_width])
+        hidden_y_p = dist_y.sample([batch_size, y_height, y_width])
 
         with tf.GradientTape() as disc_tape:
-            fake_data = generator.call(hidden_z, hidden_y)
-            fake_data_p = generator.call(hidden_z_p, hidden_y_p)
+            fake_pred = generator.call(hidden_z, hidden_y, real_in)
+            fake_pred_p = generator.call(hidden_z_p, hidden_y_p, real_in_p)
 
-            h_fake = discriminator_h.call(fake_data)
+            h_fake = discriminator_h.call(fake_pred)
 
-            m_real = discriminator_m.call(real_x)
-            m_fake = discriminator_m.call(fake_data)
+            m_real = discriminator_m.call(real_pred)
+            m_fake = discriminator_m.call(fake_pred)
 
-            h_real_p = discriminator_h.call(real_x_p)
-            h_fake_p = discriminator_h.call(fake_data_p)
+            h_real_p = discriminator_h.call(real_pred_p)
+            h_fake_p = discriminator_h.call(fake_pred_p)
 
-            m_real_p = discriminator_m.call(real_data_p)
+            m_real_p = discriminator_m.call(real_pred_p)
 
             loss1 = gan_utils.compute_mixed_sinkhorn_loss(
-                real_data, fake_data, m_real, m_fake, h_fake, scaling_coef,
-                sinkhorn_eps, sinkhorn_l, real_data_p, fake_data_p, m_real_p,
+                real_pred, fake_pred, m_real, m_fake, h_fake, scaling_coef,
+                sinkhorn_eps, sinkhorn_l, real_pred_p, fake_pred_p, m_real_p,
                 h_real_p, h_fake_p)
             pm1 = gan_utils.scale_invariante_martingale_regularization(
                 m_real, reg_penalty, scaling_coef)
@@ -199,30 +199,30 @@ def train(args):
         dischm_optimiser.apply_gradients(zip(discm_grads, discriminator_m.trainable_variables))
 
     @tf.function
-    def gen_training_step(real_x, real_x_p):
-        hidden_z = dist_z.sample([batch_size, time_steps, z_width * z_height])
-        hidden_z_p = dist_z.sample([batch_size, time_steps, z_width * z_height])
+    def gen_training_step(real_in, real_in_p, real_pred, real_pred_p):
+        hidden_z = dist_z.sample([batch_size, pred_time_steps, z_height, z_width])
+        hidden_z_p = dist_z.sample([batch_size, pred_time_steps, z_height, z_width])
 
-        hidden_y = dist_y.sample([batch_size, y_dims])
-        hidden_y_p = dist_y.sample([batch_size, y_dims])
+        hidden_y = dist_y.sample([batch_size, y_height, y_width])
+        hidden_y_p = dist_y.sample([batch_size, y_height, y_width])
 
         with tf.GradientTape() as gen_tape:
-            fake_data = generator.call(hidden_z, hidden_y)
-            fake_data_p = generator.call(hidden_z_p, hidden_y_p)
+            fake_pred = generator.call(hidden_z, hidden_y, real_in)
+            fake_pred_p = generator.call(hidden_z_p, hidden_y_p, real_in_p)
 
-            h_fake = discriminator_h.call(fake_data)
+            h_fake = discriminator_h.call(fake_pred)
 
-            m_real = discriminator_m.call(real_x)
-            m_fake = discriminator_m.call(fake_data)
+            m_real = discriminator_m.call(real_pred)
+            m_fake = discriminator_m.call(fake_pred)
 
-            h_real_p = discriminator_h.call(real_x_p)
-            h_fake_p = discriminator_h.call(fake_data_p)
+            h_real_p = discriminator_h.call(real_pred_p)
+            h_fake_p = discriminator_h.call(fake_pred_p)
 
-            m_real_p = discriminator_m.call(real_data_p)
+            m_real_p = discriminator_m.call(real_pred_p)
 
             loss2 = gan_utils.compute_mixed_sinkhorn_loss(
-                real_data, fake_data, m_real, m_fake, h_fake, scaling_coef,
-                sinkhorn_eps, sinkhorn_l, real_data_p, fake_data_p, m_real_p,
+                real_pred, fake_pred, m_real, m_fake, h_fake, scaling_coef,
+                sinkhorn_eps, sinkhorn_l, real_pred_p, fake_pred_p, m_real_p,
                 h_real_p, h_fake_p)
 
             gen_loss = loss2
@@ -242,13 +242,26 @@ def train(args):
                 real_data = x[0:batch_size, ]
                 real_data_p = x[batch_size:, ]
 
-                real_data = tf.reshape(real_data, [batch_size, x_height, x_width * time_steps, -1])
-                real_data_p = tf.reshape(real_data_p, [batch_size, x_height, x_width * time_steps, -1])
+                real_data = tf.reshape(real_data, [batch_size, x_height, x_width, total_time_steps, -1])
+                real_data_p = tf.reshape(real_data_p, [batch_size, x_height, x_width, total_time_steps, -1])
+
                 # throw away alpha channel
                 real_data = real_data[..., :channels]
                 real_data_p = real_data_p[..., :channels]
-                disc_training_step(real_data, real_data_p)
-                loss = gen_training_step(real_data, real_data_p)
+
+                # split real data to training inputs and predictions
+                real_inputs = real_data[:, :, :, :int_time_steps, :]
+                real_inputs_p = real_data_p[:, :, :, :int_time_steps, :]
+                real_preds = real_data[:, :, :, int_time_steps:, :]
+                real_preds_p = real_data_p[:, :, :, int_time_steps:, :]
+
+                real_inputs = tf.reshape(real_inputs, [batch_size, x_height, x_width * int_time_steps, -1])
+                real_inputs_p = tf.reshape(real_inputs_p, [batch_size, x_height, x_width * int_time_steps, -1])
+                real_preds = tf.reshape(real_preds, [batch_size, x_height, x_width * pred_time_steps, -1])
+                real_preds_p = tf.reshape(real_preds_p, [batch_size, x_height, x_width * pred_time_steps, -1])
+
+                disc_training_step(real_inputs, real_inputs_p, real_preds, real_preds_p)
+                loss = gen_training_step(real_inputs, real_inputs_p, real_preds, real_preds_p)
                 it.set_postfix(loss=float(loss))
                 it.update(1)
 
@@ -265,11 +278,26 @@ def train(args):
                     break
                 else:
                     if it_counts % save_freq == 0 or it_counts == 1:
-                        z = dist_z.sample([batch_size, time_steps, z_width * z_height])
-                        y = dist_y.sample([batch_size, y_dims])
-                        samples = generator.call(z, y, training=False)
+                        for x in batched_x.take(1):
+                            if x.shape[0] != batch_size * 2:
+                                continue
+                            # split the batches for x and x'
+                            real_data = x[0:batch_size,]
+
+                            real_data = tf.reshape(real_data, [batch_size, x_height, x_width, total_time_steps, -1])
+
+                            # throw away alpha channel
+                            real_data = real_data[..., :channels]
+
+                            # split real data to training inputs and predictions
+                            real_inputs = real_data[:, :, :, :int_time_steps, :]
+                            real_preds = real_data[:, :, :, int_time_steps:, :]
+
+                        z = dist_z.sample([batch_size, pred_time_steps, z_height, z_width])
+                        y = dist_y.sample([batch_size, y_height, y_width])
+                        samples = generator.call(z, y, real_inputs, training=False)
                         # plot first 10 samples within one image
-                        img = tf.concat(list(samples[:10]), axis=0)[None]
+                        img = tf.concat(list(samples[:min(10, batch_size)]), axis=0)[None]
                         with train_writer.as_default():
                             tf.summary.image("Training data", img, step=it_counts)
                         # save model to file
@@ -291,18 +319,18 @@ if __name__ == '__main__':
     parser.add_argument('-gfs', '--g_filter_size', type=int, default=32)
     parser.add_argument('-dss', '--d_state_size', type=int, default=32)
     parser.add_argument('-dfs', '--d_filter_size', type=int, default=32)
-    
     # animation data has T=13 and human action data has T=16
-    parser.add_argument('-ts', '--time_steps', type=int, default=13)
+    parser.add_argument('-tts', '--total_time_steps', type=int, default=13)
+    parser.add_argument('-its', '--int_time_steps', type=int, default=6)
     parser.add_argument('-sinke', '--sinkhorn_eps', type=float, default=0.8)
     parser.add_argument('-reg_p', '--reg_penalty', type=float, default=0.01)
     parser.add_argument('-sinkl', '--sinkhorn_l', type=int, default=100)
     parser.add_argument('-Dx', '--Dx', type=int, default=1)
-    parser.add_argument('-Dz', '--z_dims_t', type=int, default=5)
-    parser.add_argument('-Dy', '--y_dims', type=int, default=20)
+    parser.add_argument('-Dz', '--z_dims_t', type=int, default=6)
+    parser.add_argument('-Dy', '--y_dims_t', type=int, default=6)
     parser.add_argument('-g', '--gen', type=str, default="fc",
                         choices=["lstm", "fc"])
-    parser.add_argument('-bs', '--batch_size', type=int, default=4)
+    parser.add_argument('-bs', '--batch_size', type=int, default=2)
     parser.add_argument('-p', '--path', type=str,
                         default='/home/tianlin_xu/dataset/animation/*_data.tfrecord')
     parser.add_argument('-save', '--save_freq', type=int, default=500)
