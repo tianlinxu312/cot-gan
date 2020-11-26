@@ -304,7 +304,7 @@ if __name__ == '__main__':
                         choices=["lstm", "fc"])
     parser.add_argument('-bs', '--batch_size', type=int, default=4)
     parser.add_argument('-p', '--path', type=str,
-                        default='/home/tianlin_xu/dataset/animation/*_data.tfrecord')
+                        default='./data/animation/*.tfrecord')
     parser.add_argument('-save', '--save_freq', type=int, default=500)
     parser.add_argument('-lr', '--lr', type=float, default=1e-3)
     parser.add_argument('-bn', '--batch_norm', type=bool, default=True)

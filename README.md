@@ -34,11 +34,13 @@ $ python3 -m pip install -r requirements.txt
 ```
 
 ### Data
-.tfrecord files used in COT-GAN experiments can be downloaded here: https://drive.google.com/drive/folders/1ja9OlAyObPTDIp8bNl8rDT1RgpEt0qO-?usp=sharing
+The .tfrecord files used in the COT-GAN experiments can be downloaded here: https://drive.google.com/drive/folders/1ja9OlAyObPTDIp8bNl8rDT1RgpEt0qO-?usp=sharing
+To run the code in this repository as is, download the .tfrecord files to the corresponding subfolder inside the `data` folder.  
 
-Or can be downloaded from Google cloud storage:
+**Note:** If you have the Google Cloud SDK installed, you can copy the files using `gsutil` from this publicly accessible bucket
 
 ```
+# Download the data from Google Cloud Storage
 gsutil -m cp -r gs://munn-sandbox/cwgan/data .
 ```
 
@@ -57,8 +59,17 @@ Similarly, for training on video datasets, specify either the human action or an
 
 ```
 python3 -m video_train \
-  --dname="human_action"
+  --dname="human_action" \
+  --p="./data/human_action/*.tfrecord"
 ```
+
+or 
+```
+python3 -m video_train \
+  --dname="animation" \
+  --p="./data/animation/*.tfrecord"
+```
+
 See the code for how to modify the default values of other training parameters or hyperparameters.
 
 ## Results
