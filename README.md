@@ -39,7 +39,7 @@ $ python3 -m pip install -r requirements.txt
 Or can be downloaded from Google cloud storage:
 
 ```
-gsutil -m cp -r gs://munn-sandbox/cwgan/data ./data/
+gsutil -m cp -r gs://munn-sandbox/cwgan/data .
 ```
 
 
