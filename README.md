@@ -42,12 +42,13 @@ python3 -m toy_train \
 ```
 See the code for how to modify the default values of other training parameters or hyperparameters.
 
-Similarly, for training on video datasets, specify either the human action or animated Sprites dataset; either `human_action` or `animation`, resp.
+Similarly, for training on video datasets, specify either the human action or animated Sprites dataset; either `human_action` or `animation`, resp. For example,
 
 ```
 python3 -m video_train \
   --dname="human_action"
 ```
+See the code for how to modify the default values of other training parameters or hyperparameters.
 
 ### Data
 .tfrecord files used in COT-GAN experiments can be downloaded here: https://drive.google.com/drive/folders/1ja9OlAyObPTDIp8bNl8rDT1RgpEt0qO-?usp=sharing
