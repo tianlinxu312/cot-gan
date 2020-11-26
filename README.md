@@ -42,7 +42,7 @@ python3 -m toy_train \
 ```
 See the code for how to modify the default values of other training parameters or hyperparameters.
 
-Similarly, for training on video datasets, specify either the human action or animated Sprites dataset; either `human_action` or `animated`, resp.
+Similarly, for training on video datasets, specify either the human action or animated Sprites dataset; either `human_action` or `animation`, resp.
 
 ```
 python3 -m video_train \
