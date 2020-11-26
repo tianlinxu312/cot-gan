@@ -32,6 +32,17 @@ $ virtualenv venv
 $ source venv/bin/activate    # Activate virtual environment
 $ python3 -m pip install -r requirements.txt 
 ```
+
+### Data
+.tfrecord files used in COT-GAN experiments can be downloaded here: https://drive.google.com/drive/folders/1ja9OlAyObPTDIp8bNl8rDT1RgpEt0qO-?usp=sharing
+
+Or can be downloaded from Google cloud storage:
+
+```
+gsutil -m cp -r gs://munn-sandbox/cwgan/data ./data/
+```
+
+
 ## Training COT-GAN
 We trained COT-GAN on synthetic low-dimensional datasets as well as two high-dimensional video datasets: a [human action dataset](http://www.wisdom.weizmann.ac.il/~vision/SpaceTimeActions.html) and an [animated Sprites dataset](https://github.com/jrconway3/Universal-LPC-spritesheet)
 
@@ -49,9 +60,6 @@ python3 -m video_train \
   --dname="human_action"
 ```
 See the code for how to modify the default values of other training parameters or hyperparameters.
-
-### Data
-.tfrecord files used in COT-GAN experiments can be downloaded here: https://drive.google.com/drive/folders/1ja9OlAyObPTDIp8bNl8rDT1RgpEt0qO-?usp=sharing
 
 ## Results
 
