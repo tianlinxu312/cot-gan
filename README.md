@@ -41,7 +41,7 @@ To run the code in this repository as is, download the .tfrecord files to the co
 
 ```
 # Download the data from Google Cloud Storage
-gsutil -m cp -r gs://munn-sandbox/cwgan/data .
+$ gsutil -m cp -r gs://munn-sandbox/cwgan/data .
 ```
 
 
@@ -51,8 +51,8 @@ We trained COT-GAN on synthetic low-dimensional datasets as well as two high-dim
 For training on low-dimensional datasets, use a flag to specify either synthetic time series sine data (`SineImage`), auto-regressive data of order one (`AROne`), or EEG data (`eeg`). For example, to train on AR-1 data:
 ```
 # Train COTGAN on AR-1 data
-python3 -m toy_train \
-  --dname="AROne"
+$ python3 -m toy_train \
+    --dname="AROne"
 ```
 See the code for how to modify the default values of other training parameters or hyperparameters.
 
@@ -60,17 +60,17 @@ Similarly, for training on video datasets, specify either the human action or an
 
 ```
 # Train COTGAN on human action dataset
-python3 -m video_train \
-  --dname="human_action" \
-  --path="./data/human_action/*.tfrecord"
+$ python3 -m video_train \
+    --dname="human_action" \
+    --path="./data/human_action/*.tfrecord"
 ```
 
 or 
 ```
 # Train COTGAN on animated sprites dataset
-python3 -m video_train \
-  --dname="animation" \
-  --path="./data/animation/*.tfrecord"
+$ python3 -m video_train \
+    --dname="animation" \
+    --path="./data/animation/*.tfrecord"
 ```
 
 See the code for how to modify the default values of other training parameters or hyperparameters.
@@ -84,7 +84,7 @@ convolutional networks, and their kernel counterparts (KID, KVD). Previous studi
 with human judgement than KVD for videos, whereas KID correlates better than FID on images. Generated samples are provided below.
 
 ### Animated Sprites
-|*Sprites* | FVD      | FID       | KVD   |     KID
+| | FVD      | FID       | KVD   |     KID
 -------------|----------|-----------|-------|----------
 |MoCoGAN     | 1,108.2  | 280.25    | 146.8 |     0.34
 |direct minimization | 498.8 | **81.56** | 83.2 | **0.078**
@@ -93,7 +93,7 @@ with human judgement than KVD for videos, whereas KID correlates better than FID
 <img src="./figs/animation.gif" width="360" height="120"/>
 
 ### Human Actions 
-|*Human Actions* | FVD      | FID       | KVD   |     KID
+| | FVD      | FID       | KVD   |     KID
 -------------|----------|-----------|-------|----------
 | MoCoGAN | 1,034.3 | 151.3 | 89.0 | 0.26
 | direct minimization | 507.6 | 120.7 | **34.3** | 0.23
