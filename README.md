@@ -83,23 +83,21 @@ which compares the video sequences as a whole by mapping samples into features v
 convolutional networks, and their kernel counterparts (KID, KVD). Previous studies suggest that FVD correlates better 
 with human judgement than KVD for videos, whereas KID correlates better than FID on images. Generated samples are provided below.
 
+### Animated Sprites
 |*Sprites* | FVD      | FID       | KVD   |     KID
 -------------|----------|-----------|-------|----------
 |MoCoGAN     | 1,108.2  | 280.25    | 146.8 |     0.34
 |direct minimization | 498.8 | **81.56** | 83.2 | **0.078**
 |COT-GAN | **458.0** | 84.6 | **66.1** | 0.081
 
+<img src="./figs/animation.gif" width="360" height="120"/>
+
+### Human Actions 
 |*Human Actions* | FVD      | FID       | KVD   |     KID
 -------------|----------|-----------|-------|----------
 | MoCoGAN | 1,034.3 | 151.3 | 89.0 | 0.26
 | direct minimization | 507.6 | 120.7 | **34.3** | 0.23
 | COT-GAN | **462.8** | **58.9** | 43.7 | **0.13**
-
-### Animated Sprites
-
-<img src="./figs/animation.gif" width="360" height="120"/>
-
-### Human Actions 
 
 <img src="./figs/humanaction.gif" width="360" height="120"/>
 
