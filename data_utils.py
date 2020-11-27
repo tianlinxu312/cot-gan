@@ -183,7 +183,7 @@ class EEGData(NPData):
 
     def __init__(self, Dx, length, batch_size, nepoch=np.inf, tensor=True, seed=0, prefix="", downsample=1):
         # nsubject x n trials x channel x times_steps
-        all_data = np.load(prefix + "data/eeg_data.npy", allow_pickle=True)
+        all_data = np.load(prefix + "data/eeg/eeg_data.npy", allow_pickle=True)
         train_data = []
         test_data = []
         sep = 0.75
