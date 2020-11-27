@@ -50,6 +50,7 @@ We trained COT-GAN on synthetic low-dimensional datasets as well as two high-dim
 
 For training on low-dimensional datasets, use a flag to specify either synthetic time series sine data (`SineImage`), auto-regressive data of order one (`AROne`), or EEG data (`eeg`). For example, to train on AR-1 data:
 ```
+# Train COTGAN on AR-1 data
 python3 -m toy_train \
   --dname="AROne"
 ```
@@ -58,21 +59,29 @@ See the code for how to modify the default values of other training parameters o
 Similarly, for training on video datasets, specify either the human action or animated Sprites dataset; either `human_action` or `animation`, resp. For example,
 
 ```
+# Train COTGAN on human action dataset
 python3 -m video_train \
   --dname="human_action" \
-  --p="./data/human_action/*.tfrecord"
+  --path="./data/human_action/*.tfrecord"
 ```
 
 or 
 ```
+# Train COTGAN on animated sprites dataset
 python3 -m video_train \
   --dname="animation" \
-  --p="./data/animation/*.tfrecord"
+  --path="./data/animation/*.tfrecord"
 ```
 
 See the code for how to modify the default values of other training parameters or hyperparameters.
 
 ## Results
+Baseline models chosen for the video datasets are MoCoGAN (S. Tulyakov et al.) and direct minimization
+of the mixed Sinkhorn divergence. The evaluation metrics we use to assess model performance are the Fréchet Inception
+Distance (FID) which compares individual frames, the Fréchet Video Distance (FVD)
+which compares the video sequences as a whole by mapping samples into features via pretrained 3D
+convolutional networks, and their kernel counterparts (KID, KVD). Previous studies suggest that FVD correlates better 
+with human judgement than KVD for videos, whereas KID correlates better than FID on images. Generated samples are provided below.
 
 ### Animated Sprites
 
