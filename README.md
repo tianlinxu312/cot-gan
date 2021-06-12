@@ -101,4 +101,6 @@ with human judgement than KVD for videos, whereas KID correlates better than FID
 
 <img src="./figs/humanaction.gif" width="360" height="120"/>
 
+### More
+A minimum PyTorch implementation please see [here](https://github.com/tianlinxu312/cot-gan-pytorch).  
 
