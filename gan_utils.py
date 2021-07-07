@@ -235,4 +235,4 @@ def original_sinkhorn_loss(x, y, scaling_coef, sinkhorn_eps, sinkhorn_l):
 
     loss = 2.0 * loss_xy - loss_xx - loss_yy
 
-    return loss, nitxy, nitxx
+    return loss
